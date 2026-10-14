@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+.claude/
+.vscode/*
+!.vscode/extensions.json
+
+# Nunca versione backups reais do cofre
+cofre-backup-*.json

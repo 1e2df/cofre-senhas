@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Gerenciador de contas de jogos com login e senha criptografados no navegador" />
+    <title>Cofre de Contas de Jogos</title>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <h1>🎮 Cofre de Contas de Jogos</h1>
+        <button id="lock-btn" class="btn ghost" hidden>Bloquear</button>
+      </header>
+
+      <!-- Primeiro acesso -->
+      <section id="setup-screen" class="card auth" hidden>
+        <h2>Criar seu cofre</h2>
+        <p class="muted">
+          Escolha uma senha mestra forte. Ela <strong>não pode ser recuperada</strong>: se você
+          esquecer, perde o acesso aos dados.
+        </p>
+        <form id="setup-form">
+          <label>
+            Senha mestra
+            <input type="password" id="setup-password" required minlength="8" autocomplete="new-password" />
+          </label>
+          <div class="strength"><div class="strength-bar" id="setup-strength-bar"></div></div>
+          <small id="setup-strength-label" class="muted"></small>
+          <label>
+            Confirmar senha mestra
+            <input type="password" id="setup-confirm" required autocomplete="new-password" />
+          </label>
+          <button class="btn primary" type="submit">Criar cofre</button>
+        </form>
+        <label class="btn link">
+          Já tenho um backup — restaurar
+          <input type="file" id="setup-import-input" class="import-input" accept="application/json,.json" hidden />
+        </label>
+      </section>
+
+      <!-- Cofre bloqueado -->
+      <section id="unlock-screen" class="card auth" hidden>
+        <h2>Desbloquear cofre</h2>
+        <form id="unlock-form">
+          <label>
+            Senha mestra
+            <input type="password" id="unlock-password" required autocomplete="current-password" />
+          </label>
+          <button class="btn primary" type="submit">Desbloquear</button>
+        </form>
+        <button id="reset-btn" class="btn link danger" type="button">Apagar cofre e começar de novo</button>
+      </section>
+
+      <!-- Cofre aberto -->
+      <section id="vault-screen" hidden>
+        <div class="toolbar">
+          <input type="search" id="search" placeholder="Buscar por jogo, nick ou login…" aria-label="Buscar" />
+          <select id="platform-filter" aria-label="Filtrar por plataforma">
+            <option value="">Todas as plataformas</option>
+          </select>
+          <button id="add-btn" class="btn primary" type="button">+ Nova conta</button>
+        </div>
+        <ul id="entry-list" class="entry-list"></ul>
+        <p id="empty-state" class="muted center" hidden></p>
+        <footer class="vault-footer">
+          <button id="export-btn" class="btn ghost" type="button">Exportar backup</button>
+          <label class="btn ghost">
+            Importar backup
+            <input type="file" id="import-input" class="import-input" accept="application/json,.json" hidden />
+          </label>
+        </footer>
+      </section>
+    </main>
+
+    <dialog id="entry-dialog">
+      <form id="entry-form" method="dialog">
+        <h2 id="entry-dialog-title">Nova conta</h2>
+        <div class="grid-2">
+          <label>Jogo <input name="site" required maxlength="100" placeholder="Ex.: Valorant" /></label>
+          <label>
+            Plataforma
+            <input name="platform" list="platform-options" maxlength="50" placeholder="Ex.: Steam" />
+          </label>
+        </div>
+        <datalist id="platform-options">
+          <option value="Steam"></option>
+          <option value="Epic Games"></option>
+          <option value="Battle.net"></option>
+          <option value="Riot"></option>
+          <option value="EA App"></option>
+          <option value="Ubisoft Connect"></option>
+          <option value="PlayStation"></option>
+          <option value="Xbox"></option>
+          <option value="Nintendo"></option>
+          <option value="Mobile"></option>
+        </datalist>
+        <label>Login (usuário / e-mail) <input name="username" required autocomplete="off" /></label>
+
+        <div class="field">
+          <label for="entry-password">Senha</label>
+          <div class="input-row">
+            <input name="password" id="entry-password" type="password" required autocomplete="new-password" />
+            <button type="button" class="btn ghost" id="toggle-entry-password" aria-label="Mostrar/ocultar senha">👁</button>
+            <button type="button" class="btn ghost" id="open-generator">Gerar</button>
+          </div>
+        </div>
+        <div class="strength"><div class="strength-bar" id="entry-strength-bar"></div></div>
+        <small id="entry-strength-label" class="muted"></small>
+
+        <fieldset id="generator" class="generator" hidden>
+          <legend>Gerador de senha</legend>
+          <label class="range">
+            <span>Tamanho: <output id="gen-length-out">20</output></span>
+            <input type="range" id="gen-length" min="8" max="64" value="20" />
+          </label>
+          <label class="check"><input type="checkbox" id="gen-lowercase" checked /> a-z</label>
+          <label class="check"><input type="checkbox" id="gen-uppercase" checked /> A-Z</label>
+          <label class="check"><input type="checkbox" id="gen-numbers" checked /> 0-9</label>
+          <label class="check"><input type="checkbox" id="gen-symbols" checked /> !@#</label>
+          <button type="button" class="btn small" id="gen-apply">↻ Gerar outra</button>
+        </fieldset>
+
+        <div class="grid-2">
+          <label>Nick / ID no jogo <input name="nickname" maxlength="100" autocomplete="off" /></label>
+          <label>Servidor / região <input name="server" maxlength="50" placeholder="Ex.: BR1" /></label>
+        </div>
+        <div class="grid-2">
+          <label>Nível / rank <input name="rank" maxlength="50" placeholder="Ex.: Ouro II" /></label>
+          <label>Site do jogo <input name="url" type="url" placeholder="https://" /></label>
+        </div>
+
+        <label>Notas <textarea name="notes" rows="3" placeholder="Ex.: códigos de recuperação, e-mail vinculado…"></textarea></label>
+
+        <div class="dialog-actions">
+          <button type="button" class="btn ghost" id="entry-cancel">Cancelar</button>
+          <button type="submit" class="btn primary">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
