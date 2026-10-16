@@ -164,6 +164,20 @@ select {
   vertical-align: middle;
 }
 
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+.banner .btn { flex-shrink: 0; }
+
 .entry-list {
   list-style: none;
   padding: 0;
@@ -196,6 +210,31 @@ select {
 .entry-main > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-main a { color: inherit; }
 .entry-main > :empty { display: none; }
+
+.totp {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.totp:hover { border-color: var(--primary); }
+.totp-code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.totp-timer { font-size: 0.75rem; }
+.totp-timer.expiring { color: var(--danger); }
+code { font-size: 0.85em; }
 .entry-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 
 .vault-footer {
@@ -247,6 +286,7 @@ dialog h2 { margin: 0 0 4px; }
 .toast[data-kind='error'] { background: var(--danger); color: #fff; }
 
 @media (max-width: 560px) {
+  .banner { flex-direction: column; align-items: stretch; }
   .toolbar { flex-wrap: wrap; }
   .toolbar select { max-width: none; flex: 1; }
   .grid-2 { grid-template-columns: 1fr; }

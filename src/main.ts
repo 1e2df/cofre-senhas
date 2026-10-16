@@ -2,6 +2,7 @@ import './style.css';
 import { Vault, type Entry, type EntryInput } from './vault';
 import { generatePassword, type GeneratorOptions } from './generator';
 import { evaluateStrength } from './strength';
+import { generateTotp, parseTotp, secondsRemaining, type TotpConfig } from './totp';
 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const CLIPBOARD_CLEAR_MS = 30 * 1000;
@@ -11,6 +12,11 @@ let editingId: string | null = null;
 let lockTimer: number | undefined;
 let clipboardTimer: number | undefined;
 let toastTimer: number | undefined;
+let totpTimer: number | undefined;
+let onlyReused = false;
+
+/** Códigos 2FA visíveis na lista, atualizados a cada segundo. */
+let totpWidgets: { config: TotpConfig; code: HTMLElement; timer: HTMLElement }[] = [];
 
 // ---------- utilitários de DOM ----------
 
@@ -106,10 +112,13 @@ function openVault(): void {
 function lock(): void {
   vault = null;
   clearTimeout(lockTimer);
+  clearInterval(totpTimer);
+  totpWidgets = [];
   $<HTMLDialogElement>('entry-dialog').close();
   $('entry-list').replaceChildren();
   $<HTMLInputElement>('search').value = '';
   $<HTMLSelectElement>('platform-filter').value = '';
+  onlyReused = false;
   showScreen('unlock');
 }
 
@@ -197,14 +206,73 @@ function renderPlatformFilter(): void {
   select.hidden = platforms.length === 0;
 }
 
+function formatTotp(code: string): string {
+  return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+}
+
+async function refreshTotpCodes(): Promise<void> {
+  const now = Date.now();
+  for (const { config, code, timer } of totpWidgets) {
+    const remaining = secondsRemaining(config.period, now);
+    code.textContent = formatTotp(await generateTotp(config, now));
+    timer.textContent = `${remaining}s`;
+    timer.classList.toggle('expiring', remaining <= 5);
+  }
+}
+
+function startTotpTicker(): void {
+  clearInterval(totpTimer);
+  if (totpWidgets.length === 0) return;
+  refreshTotpCodes();
+  totpTimer = window.setInterval(refreshTotpCodes, 1000);
+}
+
+async function copyTotp(config: TotpConfig): Promise<void> {
+  await copyToClipboard(await generateTotp(config), 'Código 2FA copiado');
+}
+
+/** Linha com o código 2FA atual; chaves inválidas aparecem como aviso em vez de quebrar a lista. */
+function renderTotp(entry: Entry): HTMLElement | null {
+  if (!entry.totpSecret) return null;
+  let config: TotpConfig;
+  try {
+    config = parseTotp(entry.totpSecret);
+  } catch {
+    return el('small', { className: 'danger', textContent: '⚠ Chave 2FA inválida — edite a conta' });
+  }
+  const code = el('span', { className: 'totp-code', textContent: '••• •••' });
+  const timer = el('span', { className: 'totp-timer muted' });
+  totpWidgets.push({ config, code, timer });
+  return el(
+    'button',
+    { type: 'button', className: 'totp', title: 'Copiar código 2FA', onclick: () => copyTotp(config) },
+    '🔐 ',
+    code,
+    timer,
+  );
+}
+
+/** Aviso no topo da lista quando há senhas repetidas, com atalho para filtrar essas contas. */
+function renderReuseBanner(reused: Map<string, number>): void {
+  if (reused.size === 0) onlyReused = false;
+  $('reuse-banner').hidden = reused.size === 0;
+  $('reuse-banner-text').textContent =
+    `⚠ ${reused.size} ${reused.size === 1 ? 'conta usa' : 'contas usam'} senha repetida. ` +
+    'Se uma vazar, as outras ficam expostas.';
+  $('reuse-filter-btn').textContent = onlyReused ? 'Mostrar todas' : 'Mostrar só essas';
+}
+
 function renderEntries(): void {
   if (!vault) return;
   renderPlatformFilter();
-  const items = vault.search(
-    $<HTMLInputElement>('search').value,
-    $<HTMLSelectElement>('platform-filter').value,
-  );
-  $('entry-list').replaceChildren(...items.map(renderEntry));
+  totpWidgets = [];
+  const reused = vault.reusedPasswords();
+  renderReuseBanner(reused);
+  const items = vault
+    .search($<HTMLInputElement>('search').value, $<HTMLSelectElement>('platform-filter').value)
+    .filter((e) => !onlyReused || reused.has(e.id));
+  $('entry-list').replaceChildren(...items.map((e) => renderEntry(e, reused.get(e.id))));
+  startTotpTicker();
 
   const empty = $('empty-state');
   empty.hidden = items.length > 0;
@@ -214,7 +282,7 @@ function renderEntries(): void {
       : 'Nenhum resultado para a busca.';
 }
 
-function renderEntry(entry: Entry): HTMLLIElement {
+function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
   const title = isSafeUrl(entry.url)
     ? el('a', { href: entry.url, target: '_blank', rel: 'noopener noreferrer', textContent: entry.site })
     : el('span', { textContent: entry.site });
@@ -238,6 +306,10 @@ function renderEntry(entry: Entry): HTMLLIElement {
       el('span', { textContent: entry.nickname ? `🎮 ${entry.nickname}` : '' }),
       el('span', { className: 'muted', textContent: `Login: ${entry.username}` }),
       el('small', { className: 'muted', textContent: details }),
+      reuseCount
+        ? el('small', { className: 'danger', textContent: `⚠ Senha repetida em ${reuseCount} contas` })
+        : '',
+      renderTotp(entry) ?? '',
     ),
     el(
       'div',
@@ -280,6 +352,10 @@ async function deleteEntry(entry: Entry): Promise<void> {
 
 $('search').addEventListener('input', renderEntries);
 $('platform-filter').addEventListener('change', renderEntries);
+$('reuse-filter-btn').addEventListener('click', () => {
+  onlyReused = !onlyReused;
+  renderEntries();
+});
 $('add-btn').addEventListener('click', () => openEntryDialog());
 
 // ---------- formulário de conta ----------
@@ -303,6 +379,7 @@ const ENTRY_FIELDS = [
   'url',
   'username',
   'password',
+  'totpSecret',
   'notes',
 ] as const;
 
@@ -318,6 +395,8 @@ function openEntryDialog(entry?: Entry): void {
   entryPassword.type = 'password';
   generatorBox.hidden = true;
   updateEntryStrength();
+  updateReuseWarning();
+  updateTotpPreview();
   dialog.showModal();
 }
 
@@ -336,8 +415,18 @@ entryForm.addEventListener('submit', async (event) => {
     url: field('url').trim(),
     username: field('username').trim(),
     password: field('password'),
+    totpSecret: field('totpSecret').trim(),
     notes: field('notes'),
   };
+
+  if (input.totpSecret) {
+    try {
+      parseTotp(input.totpSecret);
+    } catch (err) {
+      $('entry-totp').focus();
+      return toast(errorMessage(err), 'error');
+    }
+  }
 
   const isEditing = editingId !== null;
   try {
@@ -352,6 +441,36 @@ entryForm.addEventListener('submit', async (event) => {
 });
 
 $('entry-cancel').addEventListener('click', () => dialog.close());
+
+/** Avisa, enquanto digita, se a senha já é usada em outra conta. */
+function updateReuseWarning(): void {
+  const warning = $('entry-reuse-warning');
+  const others = vault?.accountsWithPassword(entryPassword.value, editingId) ?? [];
+  warning.hidden = others.length === 0;
+  const names = others.map((e) => (e.nickname ? `${e.site} (${e.nickname})` : e.site));
+  warning.textContent = `⚠ Esta senha já é usada em: ${names.join(', ')}. Use o botão "Gerar" para criar uma única.`;
+}
+entryPassword.addEventListener('input', updateReuseWarning);
+
+const entryTotp = $<HTMLInputElement>('entry-totp');
+
+/** Mostra o código gerado pela chave digitada, para conferir com o app do jogo antes de salvar. */
+async function updateTotpPreview(): Promise<void> {
+  const preview = $('entry-totp-preview');
+  const value = entryTotp.value.trim();
+  preview.classList.remove('danger');
+  if (!value) {
+    preview.textContent = '';
+    return;
+  }
+  try {
+    preview.textContent = `Código atual: ${formatTotp(await generateTotp(parseTotp(value)))}`;
+  } catch (err) {
+    preview.textContent = errorMessage(err);
+    preview.classList.add('danger');
+  }
+}
+entryTotp.addEventListener('input', updateTotpPreview);
 
 $('toggle-entry-password').addEventListener('click', () => {
   entryPassword.type = entryPassword.type === 'password' ? 'text' : 'password';
@@ -378,6 +497,7 @@ function applyGeneratedPassword(): void {
     entryPassword.value = generatePassword(readGeneratorOptions());
     entryPassword.type = 'text';
     updateEntryStrength();
+    updateReuseWarning();
   } catch (err) {
     toast(errorMessage(err), 'error');
   }

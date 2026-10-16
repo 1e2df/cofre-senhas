@@ -61,6 +61,10 @@
           </select>
           <button id="add-btn" class="btn primary" type="button">+ Nova conta</button>
         </div>
+        <div id="reuse-banner" class="banner" role="status" hidden>
+          <span id="reuse-banner-text"></span>
+          <button id="reuse-filter-btn" class="btn small" type="button">Mostrar só essas</button>
+        </div>
         <ul id="entry-list" class="entry-list"></ul>
         <p id="empty-state" class="muted center" hidden></p>
         <footer class="vault-footer">
@@ -107,6 +111,7 @@
         </div>
         <div class="strength"><div class="strength-bar" id="entry-strength-bar"></div></div>
         <small id="entry-strength-label" class="muted"></small>
+        <small id="entry-reuse-warning" class="danger" hidden></small>
 
         <fieldset id="generator" class="generator" hidden>
           <legend>Gerador de senha</legend>
@@ -120,6 +125,16 @@
           <label class="check"><input type="checkbox" id="gen-symbols" checked /> !@#</label>
           <button type="button" class="btn small" id="gen-apply">↻ Gerar outra</button>
         </fieldset>
+
+        <label>
+          Chave 2FA (autenticador) — opcional
+          <input name="totpSecret" id="entry-totp" autocomplete="off" spellcheck="false" placeholder="Ex.: JBSW Y3DP EHPK 3PXP" />
+        </label>
+        <small class="muted">
+          A chave que o jogo mostra ao ativar o 2FA (ou o link <code>otpauth://</code> do QR code).
+          Para o Steam Guard, use <code>steam://CHAVE</code>.
+        </small>
+        <small id="entry-totp-preview" class="muted"></small>
 
         <div class="grid-2">
           <label>Nick / ID no jogo <input name="nickname" maxlength="100" autocomplete="off" /></label>

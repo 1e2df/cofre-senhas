@@ -25,6 +25,8 @@ export interface Entry {
   /** Login (usuário ou e-mail). */
   username: string;
   password: string;
+  /** Chave do autenticador 2FA (Base32, otpauth:// ou steam://). Vazio = sem 2FA. */
+  totpSecret: string;
   notes: string;
   createdAt: number;
   updatedAt: number;
@@ -41,7 +43,7 @@ export type KeyValueStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export const STORAGE_KEY = 'cofre-senhas:vault';
 
-const EMPTY_GAME_FIELDS = { platform: '', nickname: '', server: '', rank: '' };
+const EMPTY_GAME_FIELDS = { platform: '', nickname: '', server: '', rank: '', totpSecret: '' };
 
 /**
  * Cofre desbloqueado. Os dados ficam descriptografados apenas em memória;
@@ -124,6 +126,29 @@ export class Vault {
   platforms(): string[] {
     const names = new Set(this.data.entries.map((e) => e.platform.trim()).filter(Boolean));
     return [...names].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }
+
+  /**
+   * Contas que compartilham a senha com pelo menos outra conta.
+   * Retorna, para cada id afetado, quantas contas usam aquela mesma senha.
+   */
+  reusedPasswords(): Map<string, number> {
+    const byPassword = new Map<string, string[]>();
+    for (const e of this.data.entries) {
+      if (!e.password) continue;
+      byPassword.set(e.password, [...(byPassword.get(e.password) ?? []), e.id]);
+    }
+    const result = new Map<string, number>();
+    for (const ids of byPassword.values()) {
+      if (ids.length > 1) for (const id of ids) result.set(id, ids.length);
+    }
+    return result;
+  }
+
+  /** Outras contas que já usam esta senha (para avisar enquanto o usuário digita). */
+  accountsWithPassword(password: string, exceptId: string | null = null): Entry[] {
+    if (!password) return [];
+    return this.data.entries.filter((e) => e.id !== exceptId && e.password === password);
   }
 
   async add(input: EntryInput): Promise<Entry> {

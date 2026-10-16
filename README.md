@@ -15,6 +15,8 @@ via **PBKDF2-SHA256 (600.000 iterações)**, tudo com a [Web Crypto API](https:/
 - Cofre protegido por senha mestra (com medidor de força)
 - Adicionar, editar, excluir e buscar contas de jogos (jogo, plataforma, nick, servidor, rank, login e senha)
 - Filtro por plataforma (Steam, Riot, PlayStation…)
+- **Códigos 2FA (autenticador)** gerados no próprio app, inclusive Steam Guard (`steam://CHAVE`)
+- **Aviso de senhas repetidas** entre contas, com filtro para encontrá-las
 - Gerador de senhas aleatórias (criptograficamente seguro e sem viés)
 - Copiar usuário/senha com **limpeza automática da área de transferência** após 30s
 - **Bloqueio automático** após 5 minutos sem atividade
@@ -72,6 +74,7 @@ src/
 ├── vault.ts        # Cofre: criar, desbloquear, CRUD, backup
 ├── generator.ts    # Gerador de senhas seguro
 ├── strength.ts     # Estimativa de força da senha
+├── totp.ts         # Códigos 2FA (TOTP, RFC 6238) e Steam Guard
 ├── main.ts         # Interface (DOM)
 ├── style.css
 └── *.test.ts       # Testes com Vitest
