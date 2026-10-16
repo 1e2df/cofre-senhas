@@ -1,6 +1,7 @@
 import './style.css';
 import { ACCOUNT_TYPES, Vault, type Entry, type EntryInput } from './vault';
 import { KNOWN_PLATFORMS, platformStyle } from './platforms';
+import { icon, type IconName } from './icons';
 import { generatePassword, type GeneratorOptions } from './generator';
 import { evaluateStrength } from './strength';
 import { generateTotp, parseTotp, secondsRemaining, type TotpConfig } from './totp';
@@ -254,7 +255,7 @@ function renderTotp(entry: Entry): HTMLElement | null {
   return el(
     'button',
     { type: 'button', className: 'totp', title: 'Copiar código 2FA', onclick: () => copyTotp(config) },
-    '🔐 ',
+    icon('shield'),
     code,
     timer,
   );
@@ -341,21 +342,30 @@ function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
     ? el('a', { href: entry.url, target: '_blank', rel: 'noopener noreferrer', textContent: entry.site })
     : el('span', { textContent: entry.site });
 
-  const action = (text: string, onclick: () => void, extraClass = '') =>
-    el('button', { type: 'button', className: `btn ghost small ${extraClass}`, textContent: text, onclick });
+  /** Botão com ícone; sem `text`, mostra só o ícone e usa `label` como nome acessível. */
+  const action = (name: IconName, label: string, onclick: () => void, text = '', extraClass = '') => {
+    const button = el(
+      'button',
+      { type: 'button', className: `btn ghost small ${text ? '' : 'icon-only'} ${extraClass}`, title: label, onclick },
+      icon(name),
+    );
+    button.setAttribute('aria-label', label);
+    if (text) button.append(el('span', { textContent: text }));
+    return button;
+  };
 
-  const heading = el('strong', {}, title);
+  const tags = el('div', { className: 'tags' });
   const platformBadge = renderPlatformBadge(entry.platform);
-  if (platformBadge) heading.append(' ', platformBadge);
+  if (platformBadge) tags.append(platformBadge);
   if (entry.accountType) {
-    heading.append(
-      ' ',
+    tags.append(
       el('span', {
         className: `badge type-${entry.accountType}`,
         textContent: ACCOUNT_TYPES[entry.accountType] ?? entry.accountType,
       }),
     );
   }
+  const heading = el('div', { className: 'entry-title' }, el('strong', {}, title), tags);
 
   const avatar = el('div', { className: 'entry-avatar', textContent: entry.site.charAt(0).toUpperCase() });
   const style = platformStyle(entry.platform);
@@ -370,13 +380,18 @@ function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
   let revealTimer: number | undefined;
   const togglePassword = (show = passwordLine.hidden) => {
     passwordLine.hidden = !show;
-    revealButton.textContent = show ? 'Ocultar senha' : 'Ver senha';
+    const label = show ? 'Ocultar senha' : 'Ver senha';
+    revealButton.replaceChildren(icon(show ? 'eyeOff' : 'eye'));
+    revealButton.title = label;
+    revealButton.setAttribute('aria-label', label);
     clearTimeout(revealTimer);
     if (show) revealTimer = window.setTimeout(() => togglePassword(false), PASSWORD_REVEAL_MS);
   };
-  const revealButton = action('Ver senha', () => togglePassword());
+  const revealButton = action('eye', 'Ver senha', () => togglePassword());
 
-  const details = [entry.server, entry.rank].filter(Boolean).join(' · ');
+  const details = [entry.nickname && `🎮 ${entry.nickname}`, entry.server, entry.rank]
+    .filter(Boolean)
+    .join('  ·  ');
 
   return el(
     'li',
@@ -386,11 +401,10 @@ function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
       'div',
       { className: 'entry-main' },
       heading,
-      el('span', { textContent: entry.nickname ? `🎮 ${entry.nickname}` : '' }),
-      el('span', { className: 'muted', textContent: `Login: ${entry.username}` }),
-      el('small', { className: 'muted', textContent: details }),
+      el('span', { className: 'entry-details', textContent: details }),
+      el('span', { className: 'entry-login muted', textContent: entry.username }),
       reuseCount
-        ? el('small', { className: 'danger', textContent: `⚠ Senha repetida em ${reuseCount} contas` })
+        ? el('small', { className: 'warning-text', textContent: `⚠ Senha repetida em ${reuseCount} contas` })
         : '',
       passwordLine,
       renderTotp(entry) ?? '',
@@ -398,11 +412,16 @@ function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
     el(
       'div',
       { className: 'entry-actions' },
-      action('Copiar login', () => copyToClipboard(entry.username, 'Login copiado')),
-      action('Copiar senha', () => copyToClipboard(entry.password, 'Senha copiada — será apagada em 30s', true)),
+      action('user', 'Copiar login', () => copyToClipboard(entry.username, 'Login copiado'), 'Login'),
+      action(
+        'key',
+        'Copiar senha',
+        () => copyToClipboard(entry.password, 'Senha copiada — será apagada em 30s', true),
+        'Senha',
+      ),
       revealButton,
-      action('Editar', () => openEntryDialog(entry)),
-      action('Excluir', () => deleteEntry(entry), 'danger'),
+      action('pencil', 'Editar', () => openEntryDialog(entry)),
+      action('trash', 'Excluir', () => deleteEntry(entry), '', 'danger'),
     ),
   );
 }
@@ -679,6 +698,41 @@ for (const input of document.querySelectorAll<HTMLInputElement>('.import-input')
       toast(errorMessage(err), 'error');
     }
   });
+}
+
+// ---------- app instalável (PWA) ----------
+
+/** Evento do Chrome/Edge que permite abrir o pedido de instalação a partir de um botão. */
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+let installPrompt: BeforeInstallPromptEvent | null = null;
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  installPrompt = event as BeforeInstallPromptEvent;
+  $('install-btn').hidden = false;
+});
+
+$('install-btn').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  await installPrompt.prompt();
+  const { outcome } = await installPrompt.userChoice;
+  if (outcome === 'accepted') toast('App instalado!');
+  installPrompt = null;
+  $('install-btn').hidden = true;
+});
+
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  $('install-btn').hidden = true;
+});
+
+// Só na versão publicada: no modo dev o cache atrapalharia ver as mudanças
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
 // ---------- início ----------

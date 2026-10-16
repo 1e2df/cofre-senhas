@@ -6,8 +6,8 @@ export interface PlatformStyle {
 }
 
 export const KNOWN_PLATFORMS: readonly PlatformStyle[] = [
-  { name: 'Steam', color: '#1b2838', icon: '♨' },
-  { name: 'Epic Games', color: '#2a2a2a', icon: 'E' },
+  { name: 'Steam', color: '#2a475e', icon: '♨' },
+  { name: 'Epic Games', color: '#3b3b46', icon: 'E' },
   { name: 'Battle.net', color: '#0e6fd8', icon: '✦' },
   { name: 'Riot', color: '#d13639', icon: '✊' },
   { name: 'EA App', color: '#e5383b', icon: 'EA' },

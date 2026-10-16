@@ -4,17 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Gerenciador de contas de jogos com login e senha criptografados no navegador" />
+    <meta name="theme-color" content="#f3f4fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1220" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Cofre de Contas de Jogos</title>
   </head>
   <body>
     <main class="app">
       <header class="topbar">
-        <h1>🎮 Cofre de Contas de Jogos</h1>
-        <button id="lock-btn" class="btn ghost" hidden>Bloquear</button>
+        <div class="brand">
+          <img src="/icon.svg" alt="" width="36" height="36" />
+          <div>
+            <h1>Cofre de Jogos</h1>
+            <p class="muted">Suas contas, criptografadas no seu dispositivo</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="install-btn" class="btn ghost" type="button" hidden>Instalar app</button>
+          <button id="lock-btn" class="btn ghost" type="button" hidden>Bloquear</button>
+        </div>
       </header>
 
       <!-- Primeiro acesso -->
       <section id="setup-screen" class="card auth" hidden>
+        <img class="auth-icon" src="/icon.svg" alt="" width="56" height="56" />
         <h2>Criar seu cofre</h2>
         <p class="muted">
           Escolha uma senha mestra forte. Ela <strong>não pode ser recuperada</strong>: se você
@@ -41,7 +56,9 @@
 
       <!-- Cofre bloqueado -->
       <section id="unlock-screen" class="card auth" hidden>
-        <h2>Desbloquear cofre</h2>
+        <img class="auth-icon" src="/icon.svg" alt="" width="56" height="56" />
+        <h2>Bem-vindo de volta</h2>
+        <p class="muted">Digite a senha mestra para abrir suas contas.</p>
         <form id="unlock-form">
           <label>
             Senha mestra
@@ -84,6 +101,7 @@
     <dialog id="entry-dialog">
       <form id="entry-form" method="dialog">
         <h2 id="entry-dialog-title">Nova conta</h2>
+        <h3 class="form-section">Acesso</h3>
         <div class="grid-2">
           <label>Jogo <input name="site" required maxlength="100" placeholder="Ex.: Valorant" /></label>
           <label>
@@ -119,6 +137,7 @@
           <button type="button" class="btn small" id="gen-apply">↻ Gerar outra</button>
         </fieldset>
 
+        <h3 class="form-section">Segurança extra</h3>
         <label>
           Chave 2FA (autenticador) — opcional
           <input name="totpSecret" id="entry-totp" autocomplete="off" spellcheck="false" placeholder="Ex.: JBSW Y3DP EHPK 3PXP" />
@@ -129,6 +148,7 @@
         </small>
         <small id="entry-totp-preview" class="muted"></small>
 
+        <h3 class="form-section">Detalhes do jogo</h3>
         <div class="grid-2">
           <label>Nick / ID no jogo <input name="nickname" maxlength="100" autocomplete="off" /></label>
           <label>Servidor / região <input name="server" maxlength="50" placeholder="Ex.: BR1" /></label>

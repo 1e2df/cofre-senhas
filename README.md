@@ -25,6 +25,7 @@ via **PBKDF2-SHA256 (600.000 iterações)**, tudo com a [Web Crypto API](https:/
 - **Bloqueio automático** após 5 minutos sem atividade
 - Exportar/importar backup (o arquivo continua criptografado)
 - Tema claro/escuro automático e layout responsivo
+- **Instalável como app (PWA)** no PC e no celular, e funciona **offline** depois da primeira visita
 
 ## 🛡️ Como a segurança funciona
 
@@ -72,6 +73,10 @@ Acesse `http://localhost:5173`.
 ## 📁 Estrutura
 
 ```
+public/
+├── manifest.webmanifest  # Dados do app instalável
+├── sw.js                 # Service worker (modo offline)
+└── icon*.png / icon.svg  # Ícones do app
 src/
 ├── crypto.ts       # PBKDF2 + AES-GCM (Web Crypto API)
 ├── vault.ts        # Cofre: criar, desbloquear, CRUD, backup
@@ -79,6 +84,7 @@ src/
 ├── strength.ts     # Estimativa de força da senha
 ├── totp.ts         # Códigos 2FA (TOTP, RFC 6238) e Steam Guard
 ├── platforms.ts    # Cores e ícones das plataformas
+├── icons.ts        # Ícones SVG da interface
 ├── main.ts         # Interface (DOM)
 ├── style.css
 └── *.test.ts       # Testes com Vitest
@@ -101,7 +107,6 @@ gerador (tamanho, tipos de caractere, aleatoriedade), força da senha, CRUD, bus
 - [ ] Categorias/pastas e favoritos
 - [ ] Verificar senhas vazadas com a API [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) (k-anonymity)
 - [ ] Usar Argon2id (via WebAssembly) no lugar do PBKDF2
-- [ ] Transformar em PWA para funcionar offline
 - [ ] Content Security Policy restritiva
 
 ## 📄 Licença

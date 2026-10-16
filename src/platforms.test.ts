@@ -3,7 +3,7 @@ import { KNOWN_PLATFORMS, platformStyle } from './platforms';
 
 describe('platformStyle', () => {
   it('reconhece plataformas conhecidas ignorando maiúsculas, espaços e pontos', () => {
-    expect(platformStyle('Steam')?.color).toBe('#1b2838');
+    expect(platformStyle('Steam')?.color).toBe('#2a475e');
     expect(platformStyle('  playstation ')?.name).toBe('PlayStation');
     expect(platformStyle('battlenet')?.name).toBe('Battle.net');
     expect(platformStyle('EPICGAMES')?.name).toBe('Epic Games');
