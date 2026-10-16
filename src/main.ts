@@ -1,5 +1,5 @@
 import './style.css';
-import { ACCOUNT_TYPES, Vault, type Entry, type EntryInput } from './vault';
+import { ACCOUNT_TYPES, Vault, preferredSpelling, type Entry, type EntryInput } from './vault';
 import { KNOWN_PLATFORMS, platformStyle } from './platforms';
 import { icon, type IconName } from './icons';
 import { generatePassword, type GeneratorOptions } from './generator';
@@ -320,7 +320,7 @@ function renderGameGroup(key: string, group: Entry[], reused: Map<string, number
     el(
       'summary',
       {},
-      el('strong', { textContent: group[0].site }),
+      el('strong', { textContent: preferredSpelling(group.map((e) => e.site)) }),
       el('span', { className: 'muted', textContent: ` · ${group.length} contas` }),
     ),
     el('ul', { className: 'entry-list' }, ...group.map((e) => renderEntry(e, reused.get(e.id)))),

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { STORAGE_KEY, Vault, type EntryInput, type KeyValueStore } from './vault';
+import { STORAGE_KEY, Vault, preferredSpelling, type EntryInput, type KeyValueStore } from './vault';
 
 const ITERATIONS = 1_000;
 const MASTER = 'Mestra-Forte-123!';
@@ -131,6 +131,25 @@ describe('Vault', () => {
     expect(vault.search('', { platform: 'Riot', accountType: 'compartilhada' })).toEqual([]);
   });
 
+  it('junta grafias diferentes do mesmo jogo e ordena por tipo e depois por nick', async () => {
+    const vault = await Vault.create(MASTER, store, ITERATIONS);
+    await vault.add({ ...lol, site: 'valorant', nickname: 'Smurf2', accountType: 'smurf' });
+    await vault.add({ ...lol, site: 'Valorant', nickname: 'Zé', accountType: '' });
+    await vault.add({ ...lol, site: 'Valorant', nickname: 'Main', accountType: 'principal' });
+    await vault.add({ ...lol, site: 'VALORANT', nickname: 'smurf1', accountType: 'smurf' });
+    await vault.add({ ...lol, site: 'Valorant', nickname: 'Banida', accountType: 'banida' });
+    await vault.add({ ...fifa, site: 'Apex' });
+
+    expect(vault.search('').map((e) => e.nickname)).toEqual([
+      'CraqueBR', // Apex vem antes de Valorant
+      'Main',
+      'smurf1',
+      'Smurf2',
+      'Banida',
+      'Zé',
+    ]);
+  });
+
   it('troca a senha mestra e mantém as contas', async () => {
     const vault = await Vault.create(MASTER, store, ITERATIONS);
     await vault.add(lol);
@@ -213,5 +232,21 @@ describe('Vault', () => {
     expect(() => Vault.importBackup('isso não é json', store)).toThrow('inválido');
     expect(() => Vault.importBackup('{"foo": 1}', store)).toThrow('inválido');
     expect(store.getItem(STORAGE_KEY)).toBe(before);
+  });
+});
+
+describe('preferredSpelling', () => {
+  it('usa a grafia mais comum', () => {
+    expect(preferredSpelling(['fortnite', 'Fortnite', 'fortnite'])).toBe('fortnite');
+  });
+
+  it('no empate, prefere a que começa com maiúscula', () => {
+    expect(preferredSpelling(['fortnite', 'Fortnite'])).toBe('Fortnite');
+    expect(preferredSpelling(['valorant ', 'Valorant'])).toBe('Valorant');
+  });
+
+  it('ignora espaços nas pontas e nomes vazios', () => {
+    expect(preferredSpelling([' Apex ', ''])).toBe('Apex');
+    expect(preferredSpelling([])).toBe('');
   });
 });

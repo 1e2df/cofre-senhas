@@ -43,6 +43,34 @@ export const ACCOUNT_TYPES: Record<string, string> = {
   banida: 'Banida',
 };
 
+/** Compara ignorando maiúsculas e acentos ("valorant" = "Valorant"). */
+const compareText = (a: string, b: string) =>
+  a.trim().localeCompare(b.trim(), 'pt-BR', { sensitivity: 'base' });
+
+/** Ordem dos tipos dentro de um jogo: principal primeiro, sem tipo por último. */
+const typeRank = (type: string) => {
+  const index = Object.keys(ACCOUNT_TYPES).indexOf(type);
+  return index === -1 ? Object.keys(ACCOUNT_TYPES).length : index;
+};
+
+/**
+ * Escolhe como exibir um nome digitado de jeitos diferentes ("fortnite", "Fortnite"):
+ * a grafia mais usada e, no empate, a que começa com maiúscula.
+ */
+export function preferredSpelling(names: readonly string[]): string {
+  const counts = new Map<string, number>();
+  for (const name of names.map((n) => n.trim()).filter(Boolean)) {
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  const startsUpper = (s: string) => s.charAt(0) !== s.charAt(0).toLocaleLowerCase('pt-BR');
+  let best = '';
+  for (const [name, count] of counts) {
+    const bestCount = counts.get(best) ?? 0;
+    if (count > bestCount || (count === bestCount && startsUpper(name) && !startsUpper(best))) best = name;
+  }
+  return best;
+}
+
 export interface SearchFilters {
   /** Vazio = todas as plataformas. */
   platform?: string;
@@ -137,7 +165,12 @@ export class Vault {
     const sorted = [...this.data.entries]
       .filter((e) => !platform || e.platform.trim() === platform)
       .filter((e) => !accountType || e.accountType === accountType)
-      .sort((a, b) => a.site.localeCompare(b.site, 'pt-BR') || a.nickname.localeCompare(b.nickname, 'pt-BR'));
+      .sort(
+        (a, b) =>
+          compareText(a.site, b.site) ||
+          typeRank(a.accountType) - typeRank(b.accountType) ||
+          compareText(a.nickname, b.nickname),
+      );
     if (!q) return sorted;
     return sorted.filter((e) =>
       [e.site, e.username, e.nickname, e.platform, e.server, e.url].some((v) =>
