@@ -1,11 +1,13 @@
 import './style.css';
-import { Vault, type Entry, type EntryInput } from './vault';
+import { ACCOUNT_TYPES, Vault, type Entry, type EntryInput } from './vault';
+import { KNOWN_PLATFORMS, platformStyle } from './platforms';
 import { generatePassword, type GeneratorOptions } from './generator';
 import { evaluateStrength } from './strength';
 import { generateTotp, parseTotp, secondsRemaining, type TotpConfig } from './totp';
 
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const CLIPBOARD_CLEAR_MS = 30 * 1000;
+const PASSWORD_REVEAL_MS = 20 * 1000;
 
 let vault: Vault | null = null;
 let editingId: string | null = null;
@@ -14,6 +16,9 @@ let clipboardTimer: number | undefined;
 let toastTimer: number | undefined;
 let totpTimer: number | undefined;
 let onlyReused = false;
+
+/** Jogos cujo grupo o usuário recolheu (chave = nome do jogo normalizado). */
+const collapsedGames = new Set<string>();
 
 /** Códigos 2FA visíveis na lista, atualizados a cada segundo. */
 let totpWidgets: { config: TotpConfig; code: HTMLElement; timer: HTMLElement }[] = [];
@@ -115,10 +120,13 @@ function lock(): void {
   clearInterval(totpTimer);
   totpWidgets = [];
   $<HTMLDialogElement>('entry-dialog').close();
+  $<HTMLDialogElement>('master-dialog').close();
   $('entry-list').replaceChildren();
   $<HTMLInputElement>('search').value = '';
   $<HTMLSelectElement>('platform-filter').value = '';
+  $<HTMLSelectElement>('type-filter').value = '';
   onlyReused = false;
+  collapsedGames.clear();
   showScreen('unlock');
 }
 
@@ -269,9 +277,18 @@ function renderEntries(): void {
   const reused = vault.reusedPasswords();
   renderReuseBanner(reused);
   const items = vault
-    .search($<HTMLInputElement>('search').value, $<HTMLSelectElement>('platform-filter').value)
+    .search($<HTMLInputElement>('search').value, {
+      platform: $<HTMLSelectElement>('platform-filter').value,
+      accountType: $<HTMLSelectElement>('type-filter').value,
+    })
     .filter((e) => !onlyReused || reused.has(e.id));
-  $('entry-list').replaceChildren(...items.map((e) => renderEntry(e, reused.get(e.id))));
+
+  const nodes = [...groupByGame(items)].map(([key, group]) =>
+    group.length === 1
+      ? renderEntry(group[0], reused.get(group[0].id))
+      : renderGameGroup(key, group, reused),
+  );
+  $('entry-list').replaceChildren(...nodes);
   startTotpTicker();
 
   const empty = $('empty-state');
@@ -280,6 +297,43 @@ function renderEntries(): void {
     vault.entries.length === 0
       ? 'Nenhuma conta de jogo salva ainda. Clique em "+ Nova conta" para começar.'
       : 'Nenhum resultado para a busca.';
+}
+
+const gameKey = (entry: Entry) => entry.site.trim().toLocaleLowerCase('pt-BR');
+
+/** Agrupa mantendo a ordem da busca (que já vem ordenada por jogo). */
+function groupByGame(items: Entry[]): Map<string, Entry[]> {
+  const groups = new Map<string, Entry[]>();
+  for (const entry of items) groups.set(gameKey(entry), [...(groups.get(gameKey(entry)) ?? []), entry]);
+  return groups;
+}
+
+/** Jogo com várias contas: um bloco que abre e fecha, lembrando o estado entre buscas. */
+function renderGameGroup(key: string, group: Entry[], reused: Map<string, number>): HTMLLIElement {
+  const details = el('details', { className: 'game-group', open: !collapsedGames.has(key) });
+  details.addEventListener('toggle', () => {
+    if (details.open) collapsedGames.delete(key);
+    else collapsedGames.add(key);
+  });
+  details.append(
+    el(
+      'summary',
+      {},
+      el('strong', { textContent: group[0].site }),
+      el('span', { className: 'muted', textContent: ` · ${group.length} contas` }),
+    ),
+    el('ul', { className: 'entry-list' }, ...group.map((e) => renderEntry(e, reused.get(e.id)))),
+  );
+  return el('li', {}, details);
+}
+
+/** Etiqueta da plataforma com a cor da marca. */
+function renderPlatformBadge(platform: string): HTMLElement | null {
+  const style = platformStyle(platform);
+  if (!style) return null;
+  const badge = el('span', { className: 'badge platform', textContent: `${style.icon} ${platform}` });
+  badge.style.setProperty('--platform-color', style.color);
+  return badge;
 }
 
 function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
@@ -291,14 +345,43 @@ function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
     el('button', { type: 'button', className: `btn ghost small ${extraClass}`, textContent: text, onclick });
 
   const heading = el('strong', {}, title);
-  if (entry.platform) heading.append(' ', el('span', { className: 'badge', textContent: entry.platform }));
+  const platformBadge = renderPlatformBadge(entry.platform);
+  if (platformBadge) heading.append(' ', platformBadge);
+  if (entry.accountType) {
+    heading.append(
+      ' ',
+      el('span', {
+        className: `badge type-${entry.accountType}`,
+        textContent: ACCOUNT_TYPES[entry.accountType] ?? entry.accountType,
+      }),
+    );
+  }
+
+  const avatar = el('div', { className: 'entry-avatar', textContent: entry.site.charAt(0).toUpperCase() });
+  const style = platformStyle(entry.platform);
+  if (style) {
+    avatar.style.background = style.color;
+    avatar.style.color = '#fff';
+    avatar.title = style.name;
+  }
+
+  // Senha visível só sob demanda, e escondida de novo depois de alguns segundos
+  const passwordLine = el('code', { className: 'password-reveal', hidden: true, textContent: entry.password });
+  let revealTimer: number | undefined;
+  const togglePassword = (show = passwordLine.hidden) => {
+    passwordLine.hidden = !show;
+    revealButton.textContent = show ? 'Ocultar senha' : 'Ver senha';
+    clearTimeout(revealTimer);
+    if (show) revealTimer = window.setTimeout(() => togglePassword(false), PASSWORD_REVEAL_MS);
+  };
+  const revealButton = action('Ver senha', () => togglePassword());
 
   const details = [entry.server, entry.rank].filter(Boolean).join(' · ');
 
   return el(
     'li',
     { className: 'entry' },
-    el('div', { className: 'entry-avatar', textContent: entry.site.charAt(0).toUpperCase() }),
+    avatar,
     el(
       'div',
       { className: 'entry-main' },
@@ -309,6 +392,7 @@ function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
       reuseCount
         ? el('small', { className: 'danger', textContent: `⚠ Senha repetida em ${reuseCount} contas` })
         : '',
+      passwordLine,
       renderTotp(entry) ?? '',
     ),
     el(
@@ -316,6 +400,7 @@ function renderEntry(entry: Entry, reuseCount?: number): HTMLLIElement {
       { className: 'entry-actions' },
       action('Copiar login', () => copyToClipboard(entry.username, 'Login copiado')),
       action('Copiar senha', () => copyToClipboard(entry.password, 'Senha copiada — será apagada em 30s', true)),
+      revealButton,
       action('Editar', () => openEntryDialog(entry)),
       action('Excluir', () => deleteEntry(entry), 'danger'),
     ),
@@ -352,6 +437,7 @@ async function deleteEntry(entry: Entry): Promise<void> {
 
 $('search').addEventListener('input', renderEntries);
 $('platform-filter').addEventListener('change', renderEntries);
+$('type-filter').addEventListener('change', renderEntries);
 $('reuse-filter-btn').addEventListener('click', () => {
   onlyReused = !onlyReused;
   renderEntries();
@@ -376,6 +462,7 @@ const ENTRY_FIELDS = [
   'nickname',
   'server',
   'rank',
+  'accountType',
   'url',
   'username',
   'password',
@@ -408,10 +495,12 @@ entryForm.addEventListener('submit', async (event) => {
   const field = (name: string) => String(data.get(name) ?? '');
   const input: EntryInput = {
     site: field('site').trim(),
-    platform: field('platform').trim(),
+    // "riot" vira "Riot": evita a mesma plataforma aparecer duas vezes no filtro
+    platform: platformStyle(field('platform'))?.name ?? '',
     nickname: field('nickname').trim(),
     server: field('server').trim(),
     rank: field('rank').trim(),
+    accountType: field('accountType'),
     url: field('url').trim(),
     username: field('username').trim(),
     password: field('password'),
@@ -516,6 +605,50 @@ for (const name of generatorChecks) {
   $(`gen-${name}`).addEventListener('change', applyGeneratedPassword);
 }
 
+// ---------- trocar senha mestra ----------
+
+const masterDialog = $<HTMLDialogElement>('master-dialog');
+const masterForm = $<HTMLFormElement>('master-form');
+const masterNew = $<HTMLInputElement>('master-new');
+const updateMasterStrength = bindStrengthMeter(
+  masterNew,
+  $('master-strength-bar'),
+  $('master-strength-label'),
+);
+
+$('change-master-btn').addEventListener('click', () => {
+  masterForm.reset();
+  updateMasterStrength();
+  masterDialog.showModal();
+  $('master-current').focus();
+});
+$('master-cancel').addEventListener('click', () => masterDialog.close());
+
+masterForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!vault) return;
+  const current = $<HTMLInputElement>('master-current');
+  const next = masterNew.value;
+  if (next !== $<HTMLInputElement>('master-confirm').value) {
+    return toast('As novas senhas não coincidem', 'error');
+  }
+  if (next === current.value) return toast('A nova senha é igual à atual', 'error');
+  if (evaluateStrength(next).score < 2) return toast('Escolha uma senha mestra mais forte', 'error');
+
+  const target = vault;
+  await withBusy(submitButton(masterForm), 'Trocando…', async () => {
+    try {
+      await target.changeMasterPassword(current.value, next);
+      masterForm.reset();
+      masterDialog.close();
+      toast('Senha mestra trocada. Exporte um backup novo.');
+    } catch (err) {
+      toast(errorMessage(err), 'error');
+      current.select();
+    }
+  });
+});
+
 // ---------- backup ----------
 
 $('export-btn').addEventListener('click', () => {
@@ -549,5 +682,11 @@ for (const input of document.querySelectorAll<HTMLInputElement>('.import-input')
 }
 
 // ---------- início ----------
+
+$('platform-options').replaceChildren(...KNOWN_PLATFORMS.map((p) => el('option', { value: p.name })));
+const typeOptions = () =>
+  Object.entries(ACCOUNT_TYPES).map(([value, label]) => el('option', { value, textContent: label }));
+$('entry-type').append(...typeOptions());
+$('type-filter').append(...typeOptions());
 
 showScreen(Vault.exists() ? 'unlock' : 'setup');

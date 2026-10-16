@@ -4,17 +4,20 @@ Gerenciador de contas de jogos (login e senha) que roda **100% no navegador**: n
 As senhas são criptografadas com **AES-256-GCM** usando uma chave derivada da sua senha mestra
 via **PBKDF2-SHA256 (600.000 iterações)**, tudo com a [Web Crypto API](https://developer.mozilla.org/pt-BR/docs/Web/API/Web_Crypto_API) nativa, sem bibliotecas de criptografia de terceiros.
 
-![CI](https://github.com/SEU-USUARIO/cofre-senhas/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Hendryck11st/cofre-senhas/actions/workflows/ci.yml/badge.svg)
 
-**[▶ Ver demo](https://SEU-USUARIO.github.io/cofre-senhas/)**
+**[▶ Ver demo](https://Hendryck11st.github.io/cofre-senhas/)**
 
 <!-- Dica: adicione um print ou GIF aqui, ex.: ![Demonstração](docs/demo.gif) -->
 
 ## ✨ Funcionalidades
 
-- Cofre protegido por senha mestra (com medidor de força)
+- Cofre protegido por senha mestra (com medidor de força), que pode ser trocada a qualquer momento
 - Adicionar, editar, excluir e buscar contas de jogos (jogo, plataforma, nick, servidor, rank, login e senha)
-- Filtro por plataforma (Steam, Riot, PlayStation…)
+- Filtro por plataforma (Steam, Riot, PlayStation…), com a cor de cada plataforma
+- Tipo de conta (principal, smurf, compartilhada, banida) com filtro
+- Contas do mesmo jogo agrupadas em blocos que abrem e fecham
+- Ver a senha na lista (some sozinha depois de 20s)
 - **Códigos 2FA (autenticador)** gerados no próprio app, inclusive Steam Guard (`steam://CHAVE`)
 - **Aviso de senhas repetidas** entre contas, com filtro para encontrá-las
 - Gerador de senhas aleatórias (criptograficamente seguro e sem viés)
@@ -51,7 +54,7 @@ A senha mestra **nunca é armazenada**. Se ela for esquecida, os dados não pode
 Pré-requisito: [Node.js](https://nodejs.org/) 20 ou superior.
 
 ```bash
-git clone https://github.com/SEU-USUARIO/cofre-senhas.git
+git clone https://github.com/Hendryck11st/cofre-senhas.git
 cd cofre-senhas
 npm install
 npm run dev
@@ -75,6 +78,7 @@ src/
 ├── generator.ts    # Gerador de senhas seguro
 ├── strength.ts     # Estimativa de força da senha
 ├── totp.ts         # Códigos 2FA (TOTP, RFC 6238) e Steam Guard
+├── platforms.ts    # Cores e ícones das plataformas
 ├── main.ts         # Interface (DOM)
 ├── style.css
 └── *.test.ts       # Testes com Vitest
@@ -94,7 +98,6 @@ gerador (tamanho, tipos de caractere, aleatoriedade), força da senha, CRUD, bus
 
 ## 🗺️ Próximos passos
 
-- [ ] Trocar a senha mestra
 - [ ] Categorias/pastas e favoritos
 - [ ] Verificar senhas vazadas com a API [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) (k-anonymity)
 - [ ] Usar Argon2id (via WebAssembly) no lugar do PBKDF2

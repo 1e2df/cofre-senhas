@@ -21,6 +21,8 @@ export interface Entry {
   server: string;
   /** Nível, rank ou elo. */
   rank: string;
+  /** Uma das chaves de `ACCOUNT_TYPES`; vazio = não informado. */
+  accountType: string;
   url: string;
   /** Login (usuário ou e-mail). */
   username: string;
@@ -34,6 +36,20 @@ export interface Entry {
 
 export type EntryInput = Omit<Entry, 'id' | 'createdAt' | 'updatedAt'>;
 
+export const ACCOUNT_TYPES: Record<string, string> = {
+  principal: 'Principal',
+  smurf: 'Smurf / secundária',
+  compartilhada: 'Compartilhada',
+  banida: 'Banida',
+};
+
+export interface SearchFilters {
+  /** Vazio = todas as plataformas. */
+  platform?: string;
+  /** Vazio = todos os tipos. */
+  accountType?: string;
+}
+
 interface VaultData {
   entries: Entry[];
 }
@@ -43,7 +59,14 @@ export type KeyValueStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export const STORAGE_KEY = 'cofre-senhas:vault';
 
-const EMPTY_GAME_FIELDS = { platform: '', nickname: '', server: '', rank: '', totpSecret: '' };
+const EMPTY_GAME_FIELDS = {
+  platform: '',
+  nickname: '',
+  server: '',
+  rank: '',
+  accountType: '',
+  totpSecret: '',
+};
 
 /**
  * Cofre desbloqueado. Os dados ficam descriptografados apenas em memória;
@@ -51,9 +74,9 @@ const EMPTY_GAME_FIELDS = { platform: '', nickname: '', server: '', rank: '', to
  */
 export class Vault {
   private constructor(
-    private readonly key: CryptoKey,
-    private readonly salt: Uint8Array,
-    private readonly iterations: number,
+    private key: CryptoKey,
+    private salt: Uint8Array,
+    private iterations: number,
     private readonly data: VaultData,
     private readonly store: KeyValueStore,
   ) {}
@@ -108,11 +131,12 @@ export class Vault {
     return this.data.entries;
   }
 
-  /** Busca por texto e, opcionalmente, filtra por plataforma (vazio = todas). */
-  search(query: string, platform = ''): Entry[] {
+  /** Busca por texto e, opcionalmente, filtra por plataforma e tipo de conta. */
+  search(query: string, { platform = '', accountType = '' }: SearchFilters = {}): Entry[] {
     const q = query.trim().toLowerCase();
     const sorted = [...this.data.entries]
       .filter((e) => !platform || e.platform.trim() === platform)
+      .filter((e) => !accountType || e.accountType === accountType)
       .sort((a, b) => a.site.localeCompare(b.site, 'pt-BR') || a.nickname.localeCompare(b.nickname, 'pt-BR'));
     if (!q) return sorted;
     return sorted.filter((e) =>
@@ -171,6 +195,30 @@ export class Vault {
     const index = this.data.entries.findIndex((e) => e.id === id);
     if (index === -1) throw new Error('Conta não encontrada');
     this.data.entries.splice(index, 1);
+    await this.save();
+  }
+
+  /**
+   * Troca a senha mestra: confere a atual, gera um salt novo e recriptografa tudo.
+   * Backups exportados antes continuam abrindo só com a senha antiga.
+   */
+  async changeMasterPassword(
+    currentPassword: string,
+    newPassword: string,
+    iterations = DEFAULT_ITERATIONS,
+  ): Promise<void> {
+    const currentKey = await deriveKey(currentPassword, this.salt, this.iterations);
+    try {
+      await decrypt(currentKey, parsePayload(this.exportBackup()));
+    } catch {
+      throw new Error('Senha mestra atual incorreta');
+    }
+
+    const salt = randomBytes(16);
+    const key = await deriveKey(newPassword, salt, iterations);
+    this.key = key;
+    this.salt = salt;
+    this.iterations = iterations;
     await this.save();
   }
 

@@ -207,7 +207,7 @@ select {
   font-weight: 700;
 }
 .entry-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.entry-main > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-main > :not(.password-reveal) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-main a { color: inherit; }
 .entry-main > :empty { display: none; }
 
@@ -235,6 +235,40 @@ select {
 .totp-timer { font-size: 0.75rem; }
 .totp-timer.expiring { color: var(--danger); }
 code { font-size: 0.85em; }
+
+.password-reveal {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.badge.platform {
+  color: var(--text);
+  border-color: var(--platform-color);
+  box-shadow: inset 3px 0 0 var(--platform-color);
+}
+.badge.type-principal { color: var(--strength-4); border-color: currentColor; }
+.badge.type-smurf { color: var(--primary); border-color: currentColor; }
+.badge.type-compartilhada { color: var(--strength-1); border-color: currentColor; }
+.badge.type-banida { color: #fff; background: var(--danger); border-color: var(--danger); }
+
+.game-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.game-group > summary {
+  cursor: pointer;
+  padding: 12px 14px;
+}
+.game-group > .entry-list { padding: 0 8px 8px; }
+.game-group .entry { background: var(--bg); }
 .entry-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 
 .vault-footer {
@@ -289,6 +323,7 @@ dialog h2 { margin: 0 0 4px; }
   .banner { flex-direction: column; align-items: stretch; }
   .toolbar { flex-wrap: wrap; }
   .toolbar select { max-width: none; flex: 1; }
+  .toolbar input { flex-basis: 100%; }
   .grid-2 { grid-template-columns: 1fr; }
   .entry { flex-wrap: wrap; }
   .entry-actions { width: 100%; justify-content: flex-start; }

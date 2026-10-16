@@ -59,6 +59,9 @@
           <select id="platform-filter" aria-label="Filtrar por plataforma">
             <option value="">Todas as plataformas</option>
           </select>
+          <select id="type-filter" aria-label="Filtrar por tipo de conta">
+            <option value="">Todos os tipos</option>
+          </select>
           <button id="add-btn" class="btn primary" type="button">+ Nova conta</button>
         </div>
         <div id="reuse-banner" class="banner" role="status" hidden>
@@ -68,6 +71,7 @@
         <ul id="entry-list" class="entry-list"></ul>
         <p id="empty-state" class="muted center" hidden></p>
         <footer class="vault-footer">
+          <button id="change-master-btn" class="btn ghost" type="button">Trocar senha mestra</button>
           <button id="export-btn" class="btn ghost" type="button">Exportar backup</button>
           <label class="btn ghost">
             Importar backup
@@ -87,18 +91,7 @@
             <input name="platform" list="platform-options" maxlength="50" placeholder="Ex.: Steam" />
           </label>
         </div>
-        <datalist id="platform-options">
-          <option value="Steam"></option>
-          <option value="Epic Games"></option>
-          <option value="Battle.net"></option>
-          <option value="Riot"></option>
-          <option value="EA App"></option>
-          <option value="Ubisoft Connect"></option>
-          <option value="PlayStation"></option>
-          <option value="Xbox"></option>
-          <option value="Nintendo"></option>
-          <option value="Mobile"></option>
-        </datalist>
+        <datalist id="platform-options"></datalist>
         <label>Login (usuário / e-mail) <input name="username" required autocomplete="off" /></label>
 
         <div class="field">
@@ -142,14 +135,48 @@
         </div>
         <div class="grid-2">
           <label>Nível / rank <input name="rank" maxlength="50" placeholder="Ex.: Ouro II" /></label>
-          <label>Site do jogo <input name="url" type="url" placeholder="https://" /></label>
+          <label>
+            Tipo de conta
+            <select name="accountType" id="entry-type">
+              <option value="">Não informado</option>
+            </select>
+          </label>
         </div>
+        <label>Site do jogo <input name="url" type="url" placeholder="https://" /></label>
 
         <label>Notas <textarea name="notes" rows="3" placeholder="Ex.: códigos de recuperação, e-mail vinculado…"></textarea></label>
 
         <div class="dialog-actions">
           <button type="button" class="btn ghost" id="entry-cancel">Cancelar</button>
           <button type="submit" class="btn primary">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="master-dialog">
+      <form id="master-form" method="dialog">
+        <h2>Trocar senha mestra</h2>
+        <p class="muted">
+          Todas as contas são recriptografadas com a nova senha. Backups exportados antes
+          continuam abrindo só com a senha antiga.
+        </p>
+        <label>
+          Senha mestra atual
+          <input type="password" id="master-current" required autocomplete="current-password" />
+        </label>
+        <label>
+          Nova senha mestra
+          <input type="password" id="master-new" required minlength="8" autocomplete="new-password" />
+        </label>
+        <div class="strength"><div class="strength-bar" id="master-strength-bar"></div></div>
+        <small id="master-strength-label" class="muted"></small>
+        <label>
+          Confirmar nova senha mestra
+          <input type="password" id="master-confirm" required autocomplete="new-password" />
+        </label>
+        <div class="dialog-actions">
+          <button type="button" class="btn ghost" id="master-cancel">Cancelar</button>
+          <button type="submit" class="btn primary">Trocar senha</button>
         </div>
       </form>
     </dialog>

@@ -23,6 +23,7 @@ const lol: EntryInput = {
   nickname: 'Mago#BR1',
   server: 'BR1',
   rank: 'Ouro II',
+  accountType: 'principal',
   url: 'https://www.leagueoflegends.com',
   username: 'jogador@exemplo.com',
   password: 'senha-do-lol-123',
@@ -36,6 +37,7 @@ const fifa: EntryInput = {
   nickname: 'CraqueBR',
   server: '',
   rank: 'Divisão 3',
+  accountType: 'compartilhada',
   url: '',
   username: 'familia@exemplo.com',
   password: 'senha-da-psn-456',
@@ -110,12 +112,49 @@ describe('Vault', () => {
     const vault = await Vault.create(MASTER, store, ITERATIONS);
     await vault.add(lol);
     await vault.add(fifa);
-    await vault.add({ ...lol, nickname: 'Smurf#BR1' });
+    await vault.add({ ...lol, nickname: 'Smurf#BR1', accountType: 'smurf' });
 
     expect(vault.platforms()).toEqual(['PlayStation', 'Riot']);
-    expect(vault.search('', 'Riot').map((e) => e.nickname)).toEqual(['Mago#BR1', 'Smurf#BR1']);
-    expect(vault.search('smurf', 'Riot')).toHaveLength(1);
-    expect(vault.search('smurf', 'PlayStation')).toEqual([]);
+    expect(vault.search('', { platform: 'Riot' }).map((e) => e.nickname)).toEqual(['Mago#BR1', 'Smurf#BR1']);
+    expect(vault.search('smurf', { platform: 'Riot' })).toHaveLength(1);
+    expect(vault.search('smurf', { platform: 'PlayStation' })).toEqual([]);
+  });
+
+  it('filtra por tipo de conta, combinando com a plataforma', async () => {
+    const vault = await Vault.create(MASTER, store, ITERATIONS);
+    await vault.add(lol);
+    await vault.add(fifa);
+    await vault.add({ ...lol, nickname: 'Smurf#BR1', accountType: 'smurf' });
+
+    expect(vault.search('', { accountType: 'smurf' }).map((e) => e.nickname)).toEqual(['Smurf#BR1']);
+    expect(vault.search('', { accountType: 'compartilhada' }).map((e) => e.site)).toEqual(['EA FC 25']);
+    expect(vault.search('', { platform: 'Riot', accountType: 'compartilhada' })).toEqual([]);
+  });
+
+  it('troca a senha mestra e mantém as contas', async () => {
+    const vault = await Vault.create(MASTER, store, ITERATIONS);
+    await vault.add(lol);
+    const oldBackup = vault.exportBackup();
+
+    await vault.changeMasterPassword(MASTER, 'Nova-Mestra-456!', ITERATIONS);
+    await vault.add(fifa); // continua gravando com a chave nova
+
+    await expect(Vault.unlock(MASTER, store)).rejects.toThrow('Senha mestra incorreta');
+    const reopened = await Vault.unlock('Nova-Mestra-456!', store);
+    expect(reopened.entries.map((e) => e.site)).toEqual(['League of Legends', 'EA FC 25']);
+    expect(JSON.parse(store.getItem(STORAGE_KEY)!).salt).not.toBe(JSON.parse(oldBackup).salt);
+  });
+
+  it('não troca a senha mestra se a atual estiver errada', async () => {
+    const vault = await Vault.create(MASTER, store, ITERATIONS);
+    await vault.add(lol);
+    const before = store.getItem(STORAGE_KEY);
+
+    await expect(vault.changeMasterPassword('errada', 'Nova-Mestra-456!', ITERATIONS)).rejects.toThrow(
+      'atual incorreta',
+    );
+    expect(store.getItem(STORAGE_KEY)).toBe(before);
+    expect((await Vault.unlock(MASTER, store)).entries).toHaveLength(1);
   });
 
   it('detecta contas que repetem a mesma senha', async () => {
@@ -149,11 +188,11 @@ describe('Vault', () => {
 
   it('abre cofres antigos sem os campos de jogo', async () => {
     const vault = await Vault.create(MASTER, store, ITERATIONS);
-    const { platform: _p, nickname: _n, server: _s, rank: _r, totpSecret: _t, ...legacy } = lol;
+    const { platform: _p, nickname: _n, server: _s, rank: _r, totpSecret: _t, accountType: _a, ...legacy } = lol;
     await vault.add(legacy as EntryInput);
 
     const reopened = await Vault.unlock(MASTER, store);
-    expect(reopened.entries[0]).toMatchObject({ platform: '', nickname: '', server: '', rank: '', totpSecret: '' });
+    expect(reopened.entries[0]).toMatchObject({ platform: '', nickname: '', server: '', rank: '', accountType: '', totpSecret: '' });
     expect(reopened.search('mago')).toEqual([]);
   });
 
